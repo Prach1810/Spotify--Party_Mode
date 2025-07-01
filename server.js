@@ -72,14 +72,11 @@ app.get('/auth/spotify/callback', async (req, res) => {
 // Create a new jam session
 app.post('/api/session/create', async (req, res) => {
   try {
-    const { accessToken, playlistId, sessionName } = req.body;
-    
+    const { accessToken, playlistId, sessionName, username, userId } = req.body;
     if (!accessToken) {
       return res.status(401).json({ error: 'Access token required' });
     }
-    
     spotifyApi.setAccessToken(accessToken);
-    
     const sessionId = require('uuid').v4();
     const session = {
       id: sessionId,
@@ -87,13 +84,13 @@ app.post('/api/session/create', async (req, res) => {
       playlistId,
       accessToken,
       createdAt: new Date(),
+      dj: { username, userId }, // DJ info
       participants: [],
       currentSong: null,
-      queue: []
+      queue: [],
+      pendingRequests: [] // Song requests awaiting DJ approval
     };
-    
     activeSessions.set(sessionId, session);
-    
     // Get playlist tracks
     if (playlistId) {
       const playlist = await spotifyApi.getPlaylist(playlistId);
@@ -107,7 +104,6 @@ app.post('/api/session/create', async (req, res) => {
         votes: 0
       }));
     }
-    
     res.json({ sessionId, session });
   } catch (error) {
     console.error('Error creating session:', error);
@@ -117,17 +113,20 @@ app.post('/api/session/create', async (req, res) => {
 
 // Join a jam session
 app.post('/api/session/join', (req, res) => {
-  const { sessionId, username } = req.body;
+  const { sessionId, username, userId } = req.body;
   
   const session = activeSessions.get(sessionId);
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
   }
-  
-  if (!session.participants.find(p => p.username === username)) {
-    session.participants.push({ username, joinedAt: new Date() });
+  // Prevent DJ from being added as a participant
+  if (session.dj && session.dj.userId === userId) {
+    return res.json({ session });
   }
-  
+  // Prevent duplicate participants by userId
+  if (!session.participants.find(p => p.userId === userId)) {
+    session.participants.push({ username, userId, joinedAt: new Date() });
+  }
   res.json({ session });
 });
 
@@ -298,6 +297,53 @@ app.post('/api/session/:sessionId/play-next', async (req, res) => {
     console.error('Error playing song:', error);
     res.status(500).json({ error: 'Failed to play song' });
   }
+});
+
+// User submits a song request
+app.post('/api/session/:sessionId/request-song', (req, res) => {
+  const { sessionId } = req.params;
+  const { song, requestedBy } = req.body; // song: { id, name, artist, uri }, requestedBy: { username, userId }
+  const session = activeSessions.get(sessionId);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  session.pendingRequests.push({ ...song, requestedBy });
+  io.to(sessionId).emit('pendingRequestsUpdate', { pendingRequests: session.pendingRequests });
+  res.json({ success: true });
+});
+
+// DJ fetches pending requests
+app.get('/api/session/:sessionId/pending-requests', (req, res) => {
+  const { sessionId } = req.params;
+  const session = activeSessions.get(sessionId);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  res.json({ pendingRequests: session.pendingRequests });
+});
+
+// DJ approves a song request
+app.post('/api/session/:sessionId/approve-request', (req, res) => {
+  const { sessionId } = req.params;
+  const { songId, userId } = req.body; // userId: DJ's userId
+  const session = activeSessions.get(sessionId);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  if (session.dj.userId !== userId) return res.status(403).json({ error: 'Only DJ can approve requests' });
+  const idx = session.pendingRequests.findIndex(s => s.id === songId);
+  if (idx === -1) return res.status(404).json({ error: 'Request not found' });
+  const song = session.pendingRequests.splice(idx, 1)[0];
+  session.queue.push({ ...song, votes: 0 });
+  io.to(sessionId).emit('queueUpdate', { queue: session.queue });
+  io.to(sessionId).emit('pendingRequestsUpdate', { pendingRequests: session.pendingRequests });
+  res.json({ success: true });
+});
+
+// DJ denies a song request
+app.post('/api/session/:sessionId/deny-request', (req, res) => {
+  const { sessionId } = req.params;
+  const { songId, userId } = req.body; // userId: DJ's userId
+  const session = activeSessions.get(sessionId);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  if (session.dj.userId !== userId) return res.status(403).json({ error: 'Only DJ can deny requests' });
+  session.pendingRequests = session.pendingRequests.filter(s => s.id !== songId);
+  io.to(sessionId).emit('pendingRequestsUpdate', { pendingRequests: session.pendingRequests });
+  res.json({ success: true });
 });
 
 // Socket.IO connection handling
