@@ -400,31 +400,32 @@ function updateStats() {
 }
 
 // Handle Spotify callback
-if (window.location.search.includes('code=')) {
+if (window.location.hash.includes('accessToken=')) {
     handleSpotifyCallback();
 }
 
 async function handleSpotifyCallback() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    
-    if (code) {
+    // Parse fragment
+    const hash = window.location.hash.substring(1); // Remove '#'
+    const params = new URLSearchParams(hash.replace(/&/g, '&'));
+    const accessToken = params.get('accessToken');
+    const refreshToken = params.get('refreshToken');
+    const userBase64 = params.get('user');
+    let user = null;
+    if (userBase64) {
         try {
-            const response = await fetch(`/auth/spotify/callback?code=${code}`);
-            const data = await response.json();
-            
-            if (data.success) {
-                localStorage.setItem('spotify_access_token', data.accessToken);
-                localStorage.setItem('spotify_user', JSON.stringify(data.user));
-                accessToken = data.accessToken;
-                currentUser = data.user;
-                updateAuthUI(true);
-                
-                // Clean URL
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
-        } catch (error) {
-            console.error('Error handling callback:', error);
+            user = JSON.parse(atob(userBase64));
+        } catch (e) {
+            user = null;
         }
+    }
+    if (accessToken && user) {
+        localStorage.setItem('spotify_access_token', accessToken);
+        localStorage.setItem('spotify_user', JSON.stringify(user));
+        window.accessToken = accessToken;
+        window.currentUser = user;
+        updateAuthUI(true);
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
     }
 } 
