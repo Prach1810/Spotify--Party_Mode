@@ -1,367 +1,399 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spotify Song Request - Collaborative Music Queue</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --spotify-green: #1db954;
-            --spotify-black: #191414;
-            --spotify-dark: #121212;
-        }
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Spotify Song Request - Collaborative Music Queue</title>
+   <script src="https://cdn.tailwindcss.com"></script>
+   <script src="/socket.io/socket.io.js"></script>
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+   <style>
+       :root {
+           --spotify-green: #1db954;
+           --spotify-black: #191414;
+           --spotify-dark: #121212;
+       }
 
-        body {
-            background-color: var(--spotify-dark);
-        }
 
-        .spotify-green {
-            background-color: var(--spotify-green);
-        }
+       body {
+           background-color: var(--spotify-dark);
+       }
 
-        .spotify-green:hover {
-            background-color: #1ed760;
-        }
 
-        .modal-backdrop {
-            background-color: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(4px);
-        }
+       .spotify-green {
+           background-color: var(--spotify-green);
+       }
 
-        .song-card {
-            background-color: #282828;
-            transition: all 0.3s ease;
-        }
 
-        .song-card:hover {
-            background-color: #333333;
-            transform: translateY(-2px);
-        }
+       .spotify-green:hover {
+           background-color: #1ed760;
+       }
 
-        .vote-animation {
-            transition: all 0.2s ease;
-        }
 
-        .vote-animation:active {
-            transform: scale(0.95);
-        }
+       .modal-backdrop {
+           background-color: rgba(0, 0, 0, 0.8);
+           backdrop-filter: blur(4px);
+       }
 
-        .queue-number {
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #1db954 0%, #1ed760 100%);
-            font-weight: bold;
-            font-size: 18px;
-        }
 
-        .current-song-card {
-            background: linear-gradient(135deg, #282828 0%, #3e3e3e 100%);
-            border: 2px solid var(--spotify-green);
-        }
+       .song-card {
+           background-color: #282828;
+           transition: all 0.3s ease;
+       }
 
-        .search-bar {
-            background-color: #282828;
-            border: 1px solid #444;
-        }
 
-        .search-bar:focus {
-            border-color: var(--spotify-green);
-            outline: none;
-        }
+       .song-card:hover {
+           background-color: #333333;
+           transform: translateY(-2px);
+       }
 
-        .stats-card {
-            background-color: #282828;
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-        }
 
-        .pulse-animation {
-            animation: pulse 2s infinite;
-        }
+       .vote-animation {
+           transition: all 0.2s ease;
+       }
 
-        @keyframes pulse {
-            0% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.6;
-            }
-            100% {
-                opacity: 1;
-            }
-        }
 
-        .session-code {
-            font-family: 'Courier New', monospace;
-            letter-spacing: 0.1em;
-        }
+       .vote-animation:active {
+           transform: scale(0.95);
+       }
 
-        /* Request status badges */
-        .badge-pending {
-            background-color: #f59e0b;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-        }
 
-        .badge-accepted {
-            background-color: #10b981;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-        }
+       .queue-number {
+           width: 40px;
+           height: 40px;
+           display: flex;
+           align-items: center;
+           justify-content: center;
+           border-radius: 50%;
+           background: linear-gradient(135deg, #1db954 0%, #1ed760 100%);
+           font-weight: bold;
+           font-size: 18px;
+       }
 
-        .badge-declined {
-            background-color: #ef4444;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-        }
 
-        /* Role indicator */
-        .role-badge {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background-color: var(--spotify-green);
-            color: white;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 14px;
-        }
+       .current-song-card {
+           background: linear-gradient(135deg, #282828 0%, #3e3e3e 100%);
+           border: 2px solid var(--spotify-green);
+       }
 
-        /* Loading spinner */
-        .spinner {
-            border: 3px solid #333;
-            border-top: 3px solid var(--spotify-green);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+       .search-bar {
+           background-color: #282828;
+           border: 1px solid #444;
+       }
+
+
+       .search-bar:focus {
+           border-color: var(--spotify-green);
+           outline: none;
+       }
+
+
+       .stats-card {
+           background-color: #282828;
+           border-radius: 12px;
+           padding: 20px;
+           text-align: center;
+       }
+
+
+       .pulse-animation {
+           animation: pulse 2s infinite;
+       }
+
+
+       @keyframes pulse {
+           0% {
+               opacity: 1;
+           }
+           50% {
+               opacity: 0.6;
+           }
+           100% {
+               opacity: 1;
+           }
+       }
+
+
+       .session-code {
+           font-family: 'Courier New', monospace;
+           letter-spacing: 0.1em;
+       }
+
+
+       /* Request status badges */
+       .badge-pending {
+           background-color: #f59e0b;
+           color: white;
+           padding: 4px 12px;
+           border-radius: 12px;
+           font-size: 12px;
+       }
+
+
+       .badge-accepted {
+           background-color: #10b981;
+           color: white;
+           padding: 4px 12px;
+           border-radius: 12px;
+           font-size: 12px;
+       }
+
+
+       .badge-declined {
+           background-color: #ef4444;
+           color: white;
+           padding: 4px 12px;
+           border-radius: 12px;
+           font-size: 12px;
+       }
+
+
+       /* Role indicator */
+       .role-badge {
+           position: absolute;
+           top: 10px;
+           right: 10px;
+           background-color: var(--spotify-green);
+           color: white;
+           padding: 6px 16px;
+           border-radius: 20px;
+           font-weight: bold;
+           font-size: 14px;
+       }
+
+
+       /* Loading spinner */
+       .spinner {
+           border: 3px solid #333;
+           border-top: 3px solid var(--spotify-green);
+           border-radius: 50%;
+           width: 40px;
+           height: 40px;
+           animation: spin 1s linear infinite;
+       }
+
+
+       @keyframes spin {
+           0% { transform: rotate(0deg); }
+           100% { transform: rotate(360deg); }
+       }
+   </style>
 </head>
 <body class="text-white">
-    <!-- Header -->
-    <header class="p-4 border-b border-gray-800">
-        <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold flex items-center">
-                <i class="fab fa-spotify text-green-500 mr-2"></i>
-                Song Request System
-            </h1>
-            <div class="flex items-center space-x-4">
-                <button id="loginBtn" class="spotify-green text-white px-6 py-2 rounded-full font-semibold">
-                    <i class="fab fa-spotify mr-2"></i>Connect Spotify
-                </button>
-                <div id="userInfo" class="hidden flex items-center space-x-3">
-                    <span id="username" class="text-gray-300"></span>
-                    <button id="logoutBtn" class="text-gray-400 hover:text-white">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </header>
+   <!-- Header -->
+   <header class="p-4 border-b border-gray-800">
+       <div class="container mx-auto flex justify-between items-center">
+           <h1 class="text-2xl font-bold flex items-center">
+               <i class="fab fa-spotify text-green-500 mr-2"></i>
+               Song Request System
+           </h1>
+           <div class="flex items-center space-x-4">
+               <button id="loginBtn" class="spotify-green text-white px-6 py-2 rounded-full font-semibold">
+                   <i class="fab fa-spotify mr-2"></i>Connect Spotify
+               </button>
+               <div id="userInfo" class="hidden flex items-center space-x-3">
+                   <span id="username" class="text-gray-300"></span>
+                   <button id="logoutBtn" class="text-gray-400 hover:text-white">
+                       <i class="fas fa-sign-out-alt"></i>
+                   </button>
+               </div>
+           </div>
+       </div>
+   </header>
 
-    <!-- Welcome/Landing Section -->
-    <section id="welcomeSection" class="container mx-auto px-4 py-16">
-        <div class="text-center max-w-2xl mx-auto">
-            <h2 class="text-5xl font-bold mb-6">Welcome to Collaborative Music</h2>
-            <p class="text-xl text-gray-400 mb-12">Let your audience choose the vibe. Create or join a session to get started.</p>
-           
-            <div class="grid md:grid-cols-2 gap-6 max-w-lg mx-auto">
-                <button id="createSessionBtn" class="bg-green-600 hover:bg-green-700 text-white p-8 rounded-xl transition-all transform hover:scale-105">
-                    <i class="fas fa-plus-circle text-4xl mb-4"></i>
-                    <h3 class="text-xl font-bold">Host a Session</h3>
-                    <p class="text-sm mt-2 opacity-90">Start a new music session as DJ</p>
-                </button>
-               
-                <button id="joinSessionBtn" class="bg-gray-700 hover:bg-gray-600 text-white p-8 rounded-xl transition-all transform hover:scale-105">
-                    <i class="fas fa-users text-4xl mb-4"></i>
-                    <h3 class="text-xl font-bold">Join Session</h3>
-                    <p class="text-sm mt-2 opacity-90">Request songs in an existing session</p>
-                </button>
-            </div>
-        </div>
-    </section>
 
-    <!-- Session Interface (Hidden by default) -->
-    <section id="sessionInterface" class="hidden container mx-auto px-4 py-8">
-        <!-- Session Header -->
-        <div class="bg-gray-800 rounded-xl p-6 mb-8 relative">
-            <div id="roleIndicator" class="role-badge hidden">DJ</div>
-            <div class="text-center">
-                <h2 id="sessionTitle" class="text-3xl font-bold mb-2">Session Name</h2>
-                <p class="text-gray-400 mb-4">Session Code: <span id="sessionCodeText" class="session-code text-green-500 font-bold text-xl"></span></p>
-                <p id="participantCount" class="text-gray-300">0 participants</p>
-            </div>
-        </div>
+   <!-- Welcome/Landing Section -->
+   <section id="welcomeSection" class="container mx-auto px-4 py-16">
+       <div class="text-center max-w-2xl mx-auto">
+           <h2 class="text-5xl font-bold mb-6">Welcome to Collaborative Music</h2>
+           <p class="text-xl text-gray-400 mb-12">Let your audience choose the vibe. Create or join a session to get started.</p>
+          
+           <div class="grid md:grid-cols-2 gap-6 max-w-lg mx-auto">
+               <button id="createSessionBtn" class="bg-green-600 hover:bg-green-700 text-white p-8 rounded-xl transition-all transform hover:scale-105">
+                   <i class="fas fa-plus-circle text-4xl mb-4"></i>
+                   <h3 class="text-xl font-bold">Host a Session</h3>
+                   <p class="text-sm mt-2 opacity-90">Start a new music session as DJ</p>
+               </button>
+              
+               <button id="joinSessionBtn" class="bg-gray-700 hover:bg-gray-600 text-white p-8 rounded-xl transition-all transform hover:scale-105">
+                   <i class="fas fa-users text-4xl mb-4"></i>
+                   <h3 class="text-xl font-bold">Join Session</h3>
+                   <p class="text-sm mt-2 opacity-90">Request songs in an existing session</p>
+               </button>
+           </div>
+       </div>
+   </section>
 
-        <!-- Current Song Section -->
-        <div id="currentSongSection" class="hidden mb-8">
-            <h3 class="text-xl font-semibold mb-4">Now Playing</h3>
-            <div class="current-song-card rounded-xl p-6 flex items-center space-x-6">
-                <img id="currentSongArt" src="https://via.placeholder.com/80" alt="Album Art" class="w-20 h-20 rounded-lg">
-                <div class="flex-1">
-                    <h4 id="currentSongName" class="text-2xl font-bold">Song Name</h4>
-                    <p id="currentSongArtist" class="text-gray-300 text-lg">Artist Name</p>
-                </div>
-                <button id="playNextBtn" class="spotify-green text-white px-6 py-3 rounded-full font-semibold hover:scale-105 transition-transform">
-                    <i class="fas fa-forward mr-2"></i>Play Next
-                </button>
-            </div>
-        </div>
 
-        <!-- Search Section -->
-        <div class="mb-8">
-            <h3 class="text-xl font-semibold mb-4">Request a Song</h3>
-            <div class="flex space-x-2">
-                <input
-                    type="text"
-                    id="searchInput"
-                    placeholder="Search for songs, artists, or albums..."
-                    class="search-bar flex-1 px-4 py-3 rounded-lg text-white"
-                >
-                <button id="searchBtn" class="spotify-green text-white px-8 py-3 rounded-lg font-semibold">
-                    <i class="fas fa-search mr-2"></i>Search
-                </button>
-            </div>
-            <div id="searchResults" class="mt-4 space-y-2"></div>
-        </div>
+   <!-- Session Interface (Hidden by default) -->
+   <section id="sessionInterface" class="hidden container mx-auto px-4 py-8">
+       <!-- Session Header -->
+       <div class="bg-gray-800 rounded-xl p-6 mb-8 relative">
+           <div id="roleIndicator" class="role-badge hidden">DJ</div>
+           <div class="text-center">
+               <h2 id="sessionTitle" class="text-3xl font-bold mb-2">Session Name</h2>
+               <p class="text-gray-400 mb-4">Session Code: <span id="sessionCodeText" class="session-code text-green-500 font-bold text-xl"></span></p>
+               <p id="participantCount" class="text-gray-300">0 participants</p>
+           </div>
+       </div>
 
-        <!-- Queue Section -->
-        <div class="mb-8">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-semibold">Song Queue</h3>
-                <div id="djControls" class="hidden space-x-2">
-                    <button class="text-gray-400 hover:text-white">
-                        <i class="fas fa-cog"></i> Manage Queue
-                    </button>
-                </div>
-            </div>
-            <div id="queueList" class="space-y-3">
-                <p class="text-gray-400 text-center py-8">No songs in queue yet. Search and add some!</p>
-            </div>
-        </div>
 
-        <!-- Pending Requests Section (DJ Only) -->
-        <div id="pendingRequestsSection" class="hidden mb-8">
-            <h3 class="text-xl font-semibold mb-4">Pending Requests</h3>
-            <div id="pendingRequestsList" class="space-y-3">
-                <p class="text-gray-400 text-center py-8">No pending requests</p>
-            </div>
-        </div>
-    </section>
+       <!-- Current Song Section -->
+       <div id="currentSongSection" class="hidden mb-8">
+           <h3 class="text-xl font-semibold mb-4">Now Playing</h3>
+           <div class="current-song-card rounded-xl p-6 flex items-center space-x-6">
+               <img id="currentSongArt" src="https://via.placeholder.com/80" alt="Album Art" class="w-20 h-20 rounded-lg">
+               <div class="flex-1">
+                   <h4 id="currentSongName" class="text-2xl font-bold">Song Name</h4>
+                   <p id="currentSongArtist" class="text-gray-300 text-lg">Artist Name</p>
+               </div>
+               <button id="playNextBtn" class="spotify-green text-white px-6 py-3 rounded-full font-semibold hover:scale-105 transition-transform">
+                   <i class="fas fa-forward mr-2"></i>Play Next
+               </button>
+           </div>
+       </div>
 
-    <!-- Stats Section -->
-    <section id="statsSection" class="hidden container mx-auto px-4 py-8">
-        <div class="grid grid-cols-3 gap-4">
-            <div class="stats-card">
-                <i class="fas fa-thumbs-up text-green-500 text-3xl mb-2"></i>
-                <h4 class="text-2xl font-bold" id="totalVotes">0</h4>
-                <p class="text-gray-400">Total Votes</p>
-            </div>
-            <div class="stats-card">
-                <i class="fas fa-music text-green-500 text-3xl mb-2"></i>
-                <h4 class="text-2xl font-bold" id="songsPlayed">0</h4>
-                <p class="text-gray-400">Songs Played</p>
-            </div>
-            <div class="stats-card">
-                <i class="fas fa-users text-green-500 text-3xl mb-2"></i>
-                <h4 class="text-2xl font-bold" id="activeUsers">0</h4>
-                <p class="text-gray-400">Active Users</p>
-            </div>
-        </div>
-    </section>
 
-    <!-- Create Session Modal -->
-    <div id="createModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50">
-        <div class="bg-gray-800 rounded-xl p-8 max-w-md w-full mx-4">
-            <h3 class="text-2xl font-bold mb-6">Create New Session</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-gray-300 mb-2">Session Name</label>
-                    <input
-                        type="text"
-                        id="sessionName"
-                        placeholder="Friday Night Party"
-                        class="w-full px-4 py-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-green-500 focus:outline-none"
-                    >
-                </div>
-                <div>
-                    <label class="block text-gray-300 mb-2">Spotify Playlist ID (Optional)</label>
-                    <input
-                        type="text"
-                        id="playlistId"
-                        placeholder="Leave empty to start fresh"
-                        class="w-full px-4 py-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-green-500 focus:outline-none"
-                    >
-                </div>
-                <div class="flex space-x-3 pt-4">
-                    <button id="createConfirmBtn" class="flex-1 spotify-green text-white py-3 rounded-lg font-semibold">
-                        Create Session
-                    </button>
-                    <button id="createCancelBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold">
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+       <!-- Search Section -->
+       <div class="mb-8">
+           <h3 class="text-xl font-semibold mb-4">Request a Song</h3>
+           <div class="flex space-x-2">
+               <input
+                   type="text"
+                   id="searchInput"
+                   placeholder="Search for songs, artists, or albums..."
+                   class="search-bar flex-1 px-4 py-3 rounded-lg text-white"
+               >
+               <button id="searchBtn" class="spotify-green text-white px-8 py-3 rounded-lg font-semibold">
+                   <i class="fas fa-search mr-2"></i>Search
+               </button>
+           </div>
+           <div id="searchResults" class="mt-4 space-y-2"></div>
+       </div>
 
-    <!-- Join Session Modal -->
-    <div id="joinModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50">
-        <div class="bg-gray-800 rounded-xl p-8 max-w-md w-full mx-4">
-            <h3 class="text-2xl font-bold mb-6">Join Session</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-gray-300 mb-2">Session Code</label>
-                    <input
-                        type="text"
-                        id="sessionCode"
-                        placeholder="Enter 6-digit code"
-                        class="w-full px-4 py-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-green-500 focus:outline-none text-center text-xl session-code"
-                        maxlength="36"
-                    >
-                </div>
-                <div>
-                    <label class="block text-gray-300 mb-2">Your Name</label>
-                    <input
-                        type="text"
-                        id="usernameInput"
-                        placeholder="Enter your name"
-                        class="w-full px-4 py-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-green-500 focus:outline-none"
-                    >
-                </div>
-                <div class="flex space-x-3 pt-4">
-                    <button id="joinConfirmBtn" class="flex-1 spotify-green text-white py-3 rounded-lg font-semibold">
-                        Join Session
-                    </button>
-                    <button id="joinCancelBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold">
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <script src="app.js"></script>
+       <!-- Queue Section -->
+       <div class="mb-8">
+           <div class="flex justify-between items-center mb-4">
+               <h3 class="text-xl font-semibold">Song Queue</h3>
+               <div id="djControls" class="hidden space-x-2">
+                   <button class="text-gray-400 hover:text-white">
+                       <i class="fas fa-cog"></i> Manage Queue
+                   </button>
+               </div>
+           </div>
+           <div id="queueList" class="space-y-3">
+               <p class="text-gray-400 text-center py-8">No songs in queue yet. Search and add some!</p>
+           </div>
+       </div>
+
+
+       <!-- Pending Requests Section (DJ Only) -->
+       <div id="pendingRequestsSection" class="hidden mb-8">
+           <h3 class="text-xl font-semibold mb-4">Pending Requests</h3>
+           <div id="pendingRequestsList" class="space-y-3">
+               <p class="text-gray-400 text-center py-8">No pending requests</p>
+           </div>
+       </div>
+   </section>
+
+
+   <!-- Stats Section -->
+   <section id="statsSection" class="hidden container mx-auto px-4 py-8">
+       <div class="grid grid-cols-3 gap-4">
+           <div class="stats-card">
+               <i class="fas fa-thumbs-up text-green-500 text-3xl mb-2"></i>
+               <h4 class="text-2xl font-bold" id="totalVotes">0</h4>
+               <p class="text-gray-400">Total Votes</p>
+           </div>
+           <div class="stats-card">
+               <i class="fas fa-music text-green-500 text-3xl mb-2"></i>
+               <h4 class="text-2xl font-bold" id="songsPlayed">0</h4>
+               <p class="text-gray-400">Songs Played</p>
+           </div>
+           <div class="stats-card">
+               <i class="fas fa-users text-green-500 text-3xl mb-2"></i>
+               <h4 class="text-2xl font-bold" id="activeUsers">0</h4>
+               <p class="text-gray-400">Active Users</p>
+           </div>
+       </div>
+   </section>
+
+
+   <!-- Create Session Modal -->
+   <div id="createModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+       <div class="bg-gray-800 rounded-xl p-8 max-w-md w-full mx-4">
+           <h3 class="text-2xl font-bold mb-6">Create New Session</h3>
+           <div class="space-y-4">
+               <div>
+                   <label class="block text-gray-300 mb-2">Session Name</label>
+                   <input
+                       type="text"
+                       id="sessionName"
+                       placeholder="Friday Night Party"
+                       class="w-full px-4 py-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-green-500 focus:outline-none"
+                   >
+               </div>
+               <div>
+                   <label class="block text-gray-300 mb-2">Spotify Playlist ID (Optional)</label>
+                   <input
+                       type="text"
+                       id="playlistId"
+                       placeholder="Leave empty to start fresh"
+                       class="w-full px-4 py-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-green-500 focus:outline-none"
+                   >
+               </div>
+               <div class="flex space-x-3 pt-4">
+                   <button id="createConfirmBtn" class="flex-1 spotify-green text-white py-3 rounded-lg font-semibold">
+                       Create Session
+                   </button>
+                   <button id="createCancelBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold">
+                       Cancel
+                   </button>
+               </div>
+           </div>
+       </div>
+   </div>
+
+
+   <!-- Join Session Modal -->
+   <div id="joinModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+       <div class="bg-gray-800 rounded-xl p-8 max-w-md w-full mx-4">
+           <h3 class="text-2xl font-bold mb-6">Join Session</h3>
+           <div class="space-y-4">
+               <div>
+                   <label class="block text-gray-300 mb-2">Session Code</label>
+                   <input
+                       type="text"
+                       id="sessionCode"
+                       placeholder="Enter 6-digit code"
+                       class="w-full px-4 py-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-green-500 focus:outline-none text-center text-xl session-code"
+                       maxlength="36"
+                   >
+               </div>
+               <div>
+                   <label class="block text-gray-300 mb-2">Your Name</label>
+                   <input
+                       type="text"
+                       id="usernameInput"
+                       placeholder="Enter your name"
+                       class="w-full px-4 py-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-green-500 focus:outline-none"
+                   >
+               </div>
+               <div class="flex space-x-3 pt-4">
+                   <button id="joinConfirmBtn" class="flex-1 spotify-green text-white py-3 rounded-lg font-semibold">
+                       Join Session
+                   </button>
+                   <button id="joinCancelBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold">
+                       Cancel
+                   </button>
+               </div>
+           </div>
+       </div>
+   </div>
+
+
+   <script src="app.js"></script>
 </body>
-</html> 
+</html>
