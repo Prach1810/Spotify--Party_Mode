@@ -42,30 +42,48 @@ app.get('/auth/spotify', (req, res) => {
     'user-read-playback-state',
     'user-read-currently-playing'
   ];
-  
+
   const authorizeURL = spotifyApi.createAuthorizeURL(scopes);
   res.redirect(authorizeURL);
 });
 
 app.get('/auth/spotify/callback', async (req, res) => {
-  const { code } = req.query;
-  
+  const { code, error } = req.query;
+
+  if (error) {
+    console.error('Spotify auth error:', error);
+    return res.status(400).send(`Authentication error: ${error}`);
+  }
+
+  if (!code) {
+    console.error('No code received in callback.');
+    return res.status(400).send('Missing authorization code.');
+  }
+
   try {
     const data = await spotifyApi.authorizationCodeGrant(code);
     const { access_token, refresh_token } = data.body;
-    
+
     spotifyApi.setAccessToken(access_token);
-    spotifyApi.setRefreshToken(refresh_token);
-    
     // Get user info
     const user = await spotifyApi.getMe();
-    // Encode user info as base64 to avoid URL issues
-    const userBase64 = Buffer.from(JSON.stringify(user.body)).toString('base64');
-    // Redirect to main page with tokens and user info in fragment
-    res.redirect(`/#accessToken=${encodeURIComponent(access_token)}&refreshToken=${encodeURIComponent(refresh_token)}&user=${encodeURIComponent(userBase64)}`);
+
+    res.send(`
+      <html>
+        <body>
+          <script>
+            // Store tokens securely and redirect
+            localStorage.setItem('spotify_access_token', '${access_token}');
+            localStorage.setItem('spotify_refresh_token', '${refresh_token}');
+            localStorage.setItem('spotify_user', '${JSON.stringify(user.body)}');
+            window.location.href = '/';
+          </script>
+        </body>
+      </html>
+    `);
   } catch (error) {
     console.error('Error getting tokens:', error);
-    res.status(500).json({ error: 'Authentication failed' });
+    res.status(500).send('Authentication failed');
   }
 });
 
@@ -113,29 +131,35 @@ app.post('/api/session/create', async (req, res) => {
 
 // Join a jam session
 app.post('/api/session/join', (req, res) => {
-  const { sessionId, username } = req.body;
-  
-  const session = activeSessions.get(sessionId);
-  if (!session) {
-    return res.status(404).json({ error: 'Session not found' });
-  }
-  
-  if (!session.participants.find(p => p.username === username)) {
-    session.participants.push({ username, joinedAt: new Date() });
-  }
-  
-  res.json({ session });
+  const { sessionId, username, userId } = req.body;
+
+    const session = activeSessions.get(sessionId);
+    if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const existingParticipant = session.participants.find(p => p.userId === userId);
+
+    if (!existingParticipant) {
+        session.participants.push({
+            username,
+            userId,
+            joinedAt: new Date()
+        });
+    }
+
+    res.json({ session });
 });
 
 // Get session info
 app.get('/api/session/:sessionId', (req, res) => {
   const { sessionId } = req.params;
   const session = activeSessions.get(sessionId);
-  
+
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
   }
-  
+
   res.json({ session });
 });
 
@@ -143,25 +167,25 @@ app.get('/api/session/:sessionId', (req, res) => {
 app.post('/api/session/:sessionId/vote', (req, res) => {
   const { sessionId } = req.params;
   const { songId, username, voteType } = req.body; // voteType: 'up' or 'down'
-  
+
   const session = activeSessions.get(sessionId);
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
   }
-  
+
   const song = session.queue.find(s => s.id === songId);
   if (!song) {
     return res.status(404).json({ error: 'Song not found' });
   }
-  
+
   // Initialize vote tracking for this song if not exists
   if (!songVotes.has(songId)) {
     songVotes.set(songId, new Map());
   }
-  
+
   const songVoteMap = songVotes.get(songId);
   const userVote = songVoteMap.get(username);
-  
+
   // Handle vote logic
   if (voteType === 'up') {
     if (userVote === 'up') {
@@ -192,14 +216,14 @@ app.post('/api/session/:sessionId/vote', (req, res) => {
       song.votes--;
     }
   }
-  
+
   // Emit real-time update to all connected clients
   io.to(sessionId).emit('voteUpdate', {
     songId,
     votes: song.votes,
     userVotes: Object.fromEntries(songVoteMap)
   });
-  
+
   res.json({ success: true, song });
 });
 
@@ -207,15 +231,15 @@ app.post('/api/session/:sessionId/vote', (req, res) => {
 app.get('/api/search', async (req, res) => {
   try {
     const { query, accessToken } = req.query;
-    
+
     if (!accessToken) {
       return res.status(401).json({ error: 'Access token required' });
     }
-    
+
     spotifyApi.setAccessToken(accessToken);
-    
+
     const results = await spotifyApi.searchTracks(query, { limit: 10 });
-    
+
     const tracks = results.body.tracks.items.map(track => ({
       id: track.id,
       name: track.name,
@@ -225,7 +249,7 @@ app.get('/api/search', async (req, res) => {
       uri: track.uri,
       albumArt: track.album.images[0]?.url
     }));
-    
+
     res.json({ tracks });
   } catch (error) {
     console.error('Error searching tracks:', error);
@@ -237,23 +261,23 @@ app.get('/api/search', async (req, res) => {
 app.post('/api/session/:sessionId/add-song', (req, res) => {
   const { sessionId } = req.params;
   const { song } = req.body;
-  
+
   const session = activeSessions.get(sessionId);
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
   }
-  
+
   // Add song to queue with 0 votes
   const newSong = {
     ...song,
     votes: 0
   };
-  
+
   session.queue.push(newSong);
-  
+
   // Emit real-time update
   io.to(sessionId).emit('queueUpdate', { queue: session.queue });
-  
+
   res.json({ success: true, song: newSong });
 });
 
@@ -261,34 +285,34 @@ app.post('/api/session/:sessionId/add-song', (req, res) => {
 app.post('/api/session/:sessionId/play-next', async (req, res) => {
   const { sessionId } = req.params;
   const { accessToken } = req.body;
-  
+
   const session = activeSessions.get(sessionId);
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
   }
-  
+
   // Sort queue by votes (highest first)
   session.queue.sort((a, b) => b.votes - a.votes);
-  
+
   const nextSong = session.queue[0];
   if (!nextSong) {
     return res.status(400).json({ error: 'No songs in queue' });
   }
-  
+
   try {
     spotifyApi.setAccessToken(accessToken);
     await spotifyApi.play({ uris: [nextSong.uri] });
-    
+
     // Remove song from queue
     session.queue.shift();
     session.currentSong = nextSong;
-    
+
     // Emit real-time update
-    io.to(sessionId).emit('songPlayed', { 
-      currentSong: nextSong, 
-      queue: session.queue 
+    io.to(sessionId).emit('songPlayed', {
+      currentSong: nextSong,
+      queue: session.queue
     });
-    
+
     res.json({ success: true, currentSong: nextSong });
   } catch (error) {
     console.error('Error playing song:', error);
@@ -346,12 +370,12 @@ app.post('/api/session/:sessionId/deny-request', (req, res) => {
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
-  
+
   socket.on('joinSession', (sessionId) => {
     socket.join(sessionId);
     console.log(`User ${socket.id} joined session ${sessionId}`);
   });
-  
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
@@ -360,4 +384,4 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-}); 
+});
