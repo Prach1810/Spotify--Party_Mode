@@ -113,20 +113,17 @@ app.post('/api/session/create', async (req, res) => {
 
 // Join a jam session
 app.post('/api/session/join', (req, res) => {
-  const { sessionId, username, userId } = req.body;
+  const { sessionId, username } = req.body;
   
   const session = activeSessions.get(sessionId);
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
   }
-  // Prevent DJ from being added as a participant
-  if (session.dj && session.dj.userId === userId) {
-    return res.json({ session });
+  
+  if (!session.participants.find(p => p.username === username)) {
+    session.participants.push({ username, joinedAt: new Date() });
   }
-  // Prevent duplicate participants by userId
-  if (!session.participants.find(p => p.userId === userId)) {
-    session.participants.push({ username, userId, joinedAt: new Date() });
-  }
+  
   res.json({ session });
 });
 
