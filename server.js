@@ -9,7 +9,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "http://127.0.0.1:3000",
+    origin: "http://127.0.0.1:3001",
     methods: ["GET", "POST"]
   }
 });
@@ -59,13 +59,10 @@ app.get('/auth/spotify/callback', async (req, res) => {
     
     // Get user info
     const user = await spotifyApi.getMe();
-    
-    res.json({
-      success: true,
-      accessToken: access_token,
-      refreshToken: refresh_token,
-      user: user.body
-    });
+    // Encode user info as base64 to avoid URL issues
+    const userBase64 = Buffer.from(JSON.stringify(user.body)).toString('base64');
+    // Redirect to main page with tokens and user info in fragment
+    res.redirect(`/#accessToken=${encodeURIComponent(access_token)}&refreshToken=${encodeURIComponent(refresh_token)}&user=${encodeURIComponent(userBase64)}`);
   } catch (error) {
     console.error('Error getting tokens:', error);
     res.status(500).json({ error: 'Authentication failed' });
