@@ -33,6 +33,7 @@ const songVotes = new Map();
 // Spotify authentication endpoints
 app.get('/auth/spotify', (req, res) => {
   const scopes = [
+    'streaming',
     'user-read-private',
     'user-read-email',
     'playlist-read-private',
@@ -102,11 +103,12 @@ app.post('/api/session/create', async (req, res) => {
       playlistId,
       accessToken,
       createdAt: new Date(),
-      dj: { username, userId }, // DJ info
+      dj: { username, userId },
       participants: [],
       currentSong: null,
       queue: [],
-      pendingRequests: [] // Song requests awaiting DJ approval
+      pendingRequests: [],
+      songsPlayed: 0 // Initialize songs played counter
     };
     activeSessions.set(sessionId, session);
     // Get playlist tracks
@@ -160,7 +162,12 @@ app.get('/api/session/:sessionId', (req, res) => {
     return res.status(404).json({ error: 'Session not found' });
   }
 
-  res.json({ session });
+  res.json({
+    session: {
+      ...session,
+      songsPlayed: session.songsPlayed || 0 // Ensure it's always a number
+    }
+  });
 });
 
 // Vote for a song
@@ -306,14 +313,20 @@ app.post('/api/session/:sessionId/play-next', async (req, res) => {
     // Remove song from queue
     session.queue.shift();
     session.currentSong = nextSong;
+    session.songsPlayed = (session.songsPlayed || 0) + 1; // Increment counter
 
     // Emit real-time update
     io.to(sessionId).emit('songPlayed', {
       currentSong: nextSong,
-      queue: session.queue
+      queue: session.queue,
+      songsPlayed: session.songsPlayed // Include in broadcast
     });
 
-    res.json({ success: true, currentSong: nextSong });
+    res.json({
+      success: true,
+      currentSong: nextSong,
+      songsPlayed: session.songsPlayed
+    });
   } catch (error) {
     console.error('Error playing song:', error);
     res.status(500).json({ error: 'Failed to play song' });
@@ -327,7 +340,12 @@ app.post('/api/session/:sessionId/request-song', (req, res) => {
   const session = activeSessions.get(sessionId);
   if (!session) return res.status(404).json({ error: 'Session not found' });
   session.pendingRequests.push({ ...song, requestedBy });
+  // Notify DJ only of new request
   io.to(sessionId).emit('pendingRequestsUpdate', { pendingRequests: session.pendingRequests });
+
+  // Emit toast popup to DJ
+  io.to(sessionId).emit('newSongRequest', { ...song, requestedBy, sessionId });
+
   res.json({ success: true });
 });
 

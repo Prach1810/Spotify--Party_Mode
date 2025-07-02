@@ -6,6 +6,7 @@
     <title>Spotify Song Request - Collaborative Music Queue</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -164,7 +165,7 @@
         <div class="container mx-auto flex justify-between items-center">
             <h1 class="text-2xl font-bold flex items-center">
                 <i class="fab fa-spotify text-green-500 mr-2"></i>
-                Song Request System
+                    Party Mode
             </h1>
             <div class="flex items-center space-x-4">
                 <button id="loginBtn" class="spotify-green text-white px-6 py-2 rounded-full font-semibold">
@@ -185,14 +186,14 @@
         <div class="text-center max-w-2xl mx-auto">
             <h2 class="text-5xl font-bold mb-6">Welcome to Collaborative Music</h2>
             <p class="text-xl text-gray-400 mb-12">Let your audience choose the vibe. Create or join a session to get started.</p>
-           
+
             <div class="grid md:grid-cols-2 gap-6 max-w-lg mx-auto">
                 <button id="createSessionBtn" class="bg-green-600 hover:bg-green-700 text-white p-8 rounded-xl transition-all transform hover:scale-105">
                     <i class="fas fa-plus-circle text-4xl mb-4"></i>
                     <h3 class="text-xl font-bold">Host a Session</h3>
                     <p class="text-sm mt-2 opacity-90">Start a new music session as DJ</p>
                 </button>
-               
+
                 <button id="joinSessionBtn" class="bg-gray-700 hover:bg-gray-600 text-white p-8 rounded-xl transition-all transform hover:scale-105">
                     <i class="fas fa-users text-4xl mb-4"></i>
                     <h3 class="text-xl font-bold">Join Session</h3>
@@ -358,10 +359,45 @@
                         Cancel
                     </button>
                 </div>
+                <!-- Request Notification Popup -->
+<div id="requestNotification" class="fixed bottom-4 right-4 hidden z-50">
+  <div class="bg-gray-800 rounded-lg shadow-xl p-4 w-80 border border-green-500">
+    <div class="flex justify-between items-start mb-3">
+      <h3 class="text-lg font-bold text-green-500">New Song Request!</h3>
+      <button onclick="hideRequestNotification()" class="text-gray-400 hover:text-white">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="flex items-center space-x-3">
+      <img id="notificationAlbumArt" src="" alt="Album Art" class="w-12 h-12 rounded">
+      <div>
+        <h4 id="notificationSongName" class="text-white font-semibold"></h4>
+        <p id="notificationArtist" class="text-gray-300 text-sm"></p>
+        <p id="notificationRequester" class="text-gray-400 text-xs mt-1"></p>
+      </div>
+    </div>
+    <div class="flex justify-end space-x-2 mt-4">
+      <button onclick="approveRequestedSong()" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm">
+        <i class="fas fa-check mr-1"></i> Add to Queue
+      </button>
+      <button onclick="denyRequestedSong()" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm">
+        <i class="fas fa-times mr-1"></i> Decline
+      </button>
+    </div>
+  </div>
+</div>
             </div>
         </div>
     </div>
+    <!-- Place inside the body -->
+<div id="djToastContainer" class="fixed top-4 right-4 space-y-3 z-50"></div>
 
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
+    <script>
+        window.onSpotifyWebPlaybackSDKReady = () => {
+            console.log('Spotify Web Playback SDK ready');
+        };
+    </script>
     <script src="app.js"></script>
 </body>
-</html> 
+</html>
