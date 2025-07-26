@@ -1,4 +1,4 @@
-# 🎵 CLTR THE AUX - Collaborative Spotify Voting System
+# 🎵 PARTY MODE - Collaborative Spotify Voting System
 
 ## Hackathon Project: "Democratize Your Playlist"
 
